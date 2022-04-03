@@ -14,3 +14,5 @@ CREATE TABLE trades(
 
 ALTER TABLE marketOrders
 ALTER direction CHECK (direction = "buy" OR "sell") ;
+
+

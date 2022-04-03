@@ -37,7 +37,7 @@ if(symbol !== "BTC/USD"){
     const insertTrade = await db.query(queryString,[symbol,type,price,size,time])
     const insertTradeArr = insertTrade[0]
     if(insertTradeArr.affectedRows !== 0){
-        res.sendStatus(201)
+        res.status(201).json({message : "Limit Order Posted Successfully",code : 201})
     }
 }else if(direction === "sell" && type === "limit"){
 
@@ -47,11 +47,11 @@ if(symbol !== "BTC/USD"){
     const insertTrade = await db.query(queryString,[symbol,type,price,size,time])
     const insertTradeArr = insertTrade[0]
     if(insertTradeArr.affectedRows !== 0){
-        res.sendStatus(201)
+        res.status(201).json({message : "Limit Order Posted Successfully",code : 201})
     }
 }else if(type === "market"){
     
-    //inserting market order buy into the database
+    //inserting market order into the database
 
 
     const queryString = "insert into marketOrders(symbol,direction,type,size,time) values(?,?,?,?,?)"
@@ -72,7 +72,7 @@ if(symbol !== "BTC/USD"){
       let index = 1;
       let askPriceSum = updateAsksArr[0].price;
       const time = Date.now()
-    //  const avgPrice = askPriceSum / index
+  
             
         for(let i = 1; i < updateAsksArr.length  ; i++){
             
@@ -99,116 +99,206 @@ if(symbol !== "BTC/USD"){
                     const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
 
                     const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',index);
-                    const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,limitSize,time]);
- 
-                }else{
-
-                    const rows = index - 1
-                    console.log(rows);
-                    const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',rows);
-                    
                     if(deleteRows[0].affectedRows !== 0){
+                        
+                        const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,limitSize,time]);
+                        
+                        //Deleting market order from the database after the trade execution 
+                        
+                        const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
+                        res.status(200).json({message : "Market Order Partially Filled Successfully", code : 200})
+
+                    }  
+ 
+                }else if(limitSize > marketBuyArr[0].size){
+                    if(index === 1){
                         const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
-                        
+                    
                         const updateRow = await db.query('UPDATE askLimitOrders SET size = ? ORDER BY price ASC,time ASC LIMIT ?',[sub,1]);
-                        const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time]);
                         
-                        console.log(deleteRows[0])
+                        
+                        if(updateRow[0].changedRows !== 0){
+                            const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,limitSize,time]);
+                          
+                            //Deleting market order from the database after the trade execution 
+                            
+                            const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
+                            res.status(200).json({message : "Market Order Filled Successfully", code : 200})
+                            
+                        }
+                    }else{
+                        const rows = index - 1
+                        
+                        const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',rows);
+                        
+                        if(deleteRows[0].affectedRows !== 0){
+                            const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
+                            
+                            const updateRow = await db.query('UPDATE askLimitOrders SET size = ? ORDER BY price ASC,time ASC LIMIT ?',[sub,1]);
+                            const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time]);
+                            
+                            
+
+                            if(updateRow[0].changedRows !== 0){
+                               //Deleting market order from the database after the trade execution 
+
+                                const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
+                                res.status(200).json({message : "Market Order Filled Successfully", code : 200})
+
+                            }
+                            
+                        }
+                        
                         
                     }
                     
-                  console.log(index);
                 }
+
+                 
+                
                 
             }else if(sub === 0){
                 const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',index);
                 
-
                 const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
-                const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time])
-            console.log(deleteRows[0]);
+                
+                
+                if(deleteRows[0].affectedRows !== 0){
+                    const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time])
+                    
+                    //Deleting market order from the database after the trade execution 
+                    
+                    const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
+                    res.status(200).json({message : "Market Order Filled Successfully", code : 200})
 
+                }
             }
-            // if (limitSize > marketBuyArr[0].size){
-            //     const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
-
-            //     const updateRow = await db.query('UPDATE askLimitOrders SET size = ? ORDER BY price ASC,time ASC LIMIT ?',[sub,1]);
-            //     const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time]);
-                
-            //     console.log(updateRow[0]);
-            
-            // }else if(sub === 0){
-                
-            //     const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',index);
-                
-
-            //     const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
-            //     const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time])
-            
-
-            // }else if(sub !== 0){
-            //     const rows = index - 1
-            //     console.log(rows);
-            //     const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',rows);
-                
-            //     if(deleteRows[0].affectedRows !== 0){
-            //         const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
-                    
-            //         const updateRow = await db.query('UPDATE askLimitOrders SET size = ? ORDER BY price ASC,time ASC LIMIT ?',[sub,1]);
-            //         const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time]);
-                    
-            //         console.log(deleteRows[0])
-                    
-            //     }
-                
-            //   console.log(index);
-                 
-            // }
            
+    }else if(direction === "sell"){
+      const marketSell = await db.query('SELECT * FROM marketOrders WHERE direction = ? ORDER BY time ASC;',"sell")
+      const updateBids = await db.query('select size,price from bidLimitOrders ORDER BY price DESC,time ASC;')
+      const marketSellArr = marketSell[0];
+      const updateBidsArr = updateBids[0];
+
+      let limitSize = updateBidsArr[0].size;
+      let index = 1;
+      let bidPriceSum = updateBidsArr[0].price;
+      const time = Date.now()
+
+
+      for(let i = 1; i < updateBidsArr.length  ; i++){
+            
+        if(marketSellArr[0].size > limitSize){                    
+            limitSize += updateBidsArr[i].size
+            index += 1
+            bidPriceSum += updateBidsArr[i].price
+
+        
+        }else{
+            
+            break;
+            
+        }
+    }
+
+    const sub = limitSize - marketSellArr[0].size;
+    const avgPrice = bidPriceSum / index
+
+    if(sub !== 0){
+
+        if(marketSellArr[0].size > limitSize){
+            const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
+
+            const deleteRows = await db.query('DELETE FROM bidLimitOrders ORDER BY price DESC,time ASC LIMIT ?;',index);
+            if(deleteRows[0].affectedRows !== 0){
+                
+                const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,limitSize,time]);
+                
+                //Deleting market order from the database after the trade execution 
+                
+                const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
+                res.status(200).json({message : "Market Order Partially Filled Successfully", code : 200})
+
+            }  
+
+        }else if(limitSize > marketSellArr[0].size){
+            if(index === 1){
+                const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
+            
+                const updateRow = await db.query('UPDATE bidLimitOrders SET size = ? ORDER BY price DESC,time ASC LIMIT ?',[sub,1]);
+                
+                
+                if(updateRow[0].changedRows !== 0){
+                    const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,limitSize,time]);
+                  
+                    //Deleting market order from the database after the trade execution 
+                    
+                    const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
+                    res.status(200).json({message : "Market Order Filled Successfully", code : 200})
+                    
+                }
+            }else{
+                const rows = index - 1
+                
+                const deleteRows = await db.query('DELETE FROM bidLimitOrders ORDER BY price DESC,time ASC LIMIT ?;',rows);
+                
+                if(deleteRows[0].affectedRows !== 0){
+                    const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
+                    
+                    const updateRow = await db.query('UPDATE bidLimitOrders SET size = ? ORDER BY price DESC,time ASC LIMIT ?',[sub,1]);
+                    const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time]);
+                    
+                    
+
+                    if(updateRow[0].changedRows !== 0){
+                       //Deleting market order from the database after the trade execution 
+
+                        const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
+                        res.status(200).json({message : "Market Order Filled Successfully", code : 200})
+
+                    }
+                    
+                }
+                
+                
+            }
+            
+        }
+
+         
+        
+        
+    }else if(sub === 0){
+        const deleteRows = await db.query('DELETE FROM bidLimitOrders ORDER BY price DESC,time ASC LIMIT ?;',index);
+        
+        const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
+        
+        
+        if(deleteRows[0].affectedRows !== 0){
+            const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time])
+            
+            //Deleting market order from the database after the trade execution 
+            
+            const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
+            res.status(200).json({message : "Market Order Filled Successfully", code : 200})
+
+        }
+    }
+
+    
+     
+    
         
     }
 
-    //sending response to the client 
-     
-    if(insertTradeMarketArr.affectedRows !== 0){
-        res.sendStatus(201)
-    }
+
 }
 
 
 });
 
-// const size = [10,5,10,100]
-// const marketSize = [20,1,3,100]
-// let limitSize = size[0];
-// let index = 0
-// let row;
-// for(let i = 1; i < 3 ; i++){
-  
-//     if(marketSize[0] > limitSize){
-//       limitSize += size[i]
-//       index += i
-      
-//     }else{
-//         console.log('breaked');  
-//         break;
-        
-//     }
-   
-    
-// }
-
-// const sub = limitSize - marketSize[0]
-// if(sub === 0){
-//     console.log(`delelte db rows ${index}`);
-// }else if(sub !== 0){
-//      row = index - 1
-//      console.log(`delete rows ${row} & update row ${0} with value ${sub}`)
-// }
-
 
 export default router;
-
 
 
 
