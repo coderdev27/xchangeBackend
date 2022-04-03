@@ -70,7 +70,7 @@ if(symbol !== "BTC/USD"){
 
       let limitSize = updateAsksArr[0].size;
       let index = 1;
-      let askPriceSum = updateAsksArr[0].price;
+      let costBasis = updateAsksArr[0].price * updateAsksArr[0].size;
       const time = Date.now()
   
             
@@ -79,7 +79,7 @@ if(symbol !== "BTC/USD"){
             if(marketBuyArr[0].size > limitSize){                    
                 limitSize += updateAsksArr[i].size
                 index += 1
-                askPriceSum += updateAsksArr[i].price
+                costBasis += updateAsksArr[i].price * updateAsksArr[i].size
 
             
             }else{
@@ -91,11 +91,11 @@ if(symbol !== "BTC/USD"){
 
 
             const sub = limitSize - marketBuyArr[0].size;
-            const avgPrice = askPriceSum / index
-
+            
             if(sub !== 0){
-
+                
                 if(marketBuyArr[0].size > limitSize){
+                    const avgPrice = costBasis / limitSize;
                     const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
 
                     const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',index);
@@ -112,14 +112,15 @@ if(symbol !== "BTC/USD"){
  
                 }else if(limitSize > marketBuyArr[0].size){
                     if(index === 1){
+                        const avgPrice = updateAsksArr[0].price
                         const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
-                    
+                        
                         const updateRow = await db.query('UPDATE askLimitOrders SET size = ? ORDER BY price ASC,time ASC LIMIT ?',[sub,1]);
                         
                         
                         if(updateRow[0].changedRows !== 0){
-                            const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,limitSize,time]);
-                          
+                            const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,marketBuyArr[0].size,time]);
+                            
                             //Deleting market order from the database after the trade execution 
                             
                             const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
@@ -127,6 +128,7 @@ if(symbol !== "BTC/USD"){
                             
                         }
                     }else{
+                        const avgPrice = costBasis / marketBuyArr[0].size;
                         const rows = index - 1
                         
                         const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',rows);
@@ -158,6 +160,8 @@ if(symbol !== "BTC/USD"){
                 
                 
             }else if(sub === 0){
+                const avgPrice = costBasis / limitSize;
+                
                 const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',index);
                 
                 const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
