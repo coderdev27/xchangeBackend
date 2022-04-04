@@ -16,3 +16,9 @@ ALTER TABLE marketOrders
 ALTER direction CHECK (direction = "buy" OR "sell") ;
 
 
+--@block
+ALTER TABLE askLimitOrders
+  DROP COLUMN postOnly;
+
+--@block
+INSERT into askLimitOrders(symbol,direction,price,type,size,time,postOnly) VALUES("BTC/USD",'sell',2,'limit',1,11,true)

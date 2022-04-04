@@ -10,7 +10,16 @@ router.use(express.urlencoded({extended : false}));
 router.post("/api/orders",async(req,res)=>{
     res.header("Access-Control-Allow-Origin", "*"); // update to match the domain you will make the request from
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-const limitOrders = {
+   
+    //Giving default value to the postOnly option
+
+    let postOnly = false;
+
+    if(req.body.postOnly || req.query.postOnly === true){
+        postOnly = true
+    }
+
+    const limitOrders = {
    // id : req.body.id || req.query.id,
     symbol : req.body.symbol || req.query.symbol,
     direction : req.body.direction || req.query.direction,
@@ -21,36 +30,11 @@ const limitOrders = {
 }
 const {symbol,direction,type,price,size,time} = limitOrders;
 
-//validating every field in the request
+//marketOrders function to insert data into database and process orders
 
-if(symbol !== "BTC/USD"){
-    res.status(400).json({message: "Invalid Symbol"})
-}else if(direction !== 'buy' && direction !== 'sell' ){
-    res.status(400).json({message : "Direction can only be buy or sell, it must be in lowercase"})
-}else if(type !== "limit" && type !== "market"){
-    res.status(400).json({message : "Order type can only be limit or market, it must be in lowercase"})
-}else if(direction === "buy" && type === "limit"){
+const marketOrders = async() => {
 
-    //inserting limit order buy into the database
-
-    const queryString = "insert into bidLimitOrders(symbol,type,price,size,time) values(?,?,?,?,?)"
-    const insertTrade = await db.query(queryString,[symbol,type,price,size,time])
-    const insertTradeArr = insertTrade[0]
-    if(insertTradeArr.affectedRows !== 0){
-        res.status(201).json({message : "Limit Order Posted Successfully",code : 201})
-    }
-}else if(direction === "sell" && type === "limit"){
-
-    //inserting limit order sell into the database
-
-    const queryString = "insert into askLimitOrders(symbol,type,price,size,time) values(?,?,?,?,?)"
-    const insertTrade = await db.query(queryString,[symbol,type,price,size,time])
-    const insertTradeArr = insertTrade[0]
-    if(insertTradeArr.affectedRows !== 0){
-        res.status(201).json({message : "Limit Order Posted Successfully",code : 201})
-    }
-}else if(type === "market"){
-    
+ 
     //inserting market order into the database
 
 
@@ -294,6 +278,135 @@ if(symbol !== "BTC/USD"){
     
         
     }
+
+} 
+
+
+//validating every field in the request
+
+if(symbol !== "BTC/USD"){
+    res.status(400).json({message: "Invalid Symbol",code : 400})
+}else if(direction !== 'buy' && direction !== 'sell' ){
+    res.status(400).json({message : "Direction can only be buy or sell, it must be in lowercase",code : 400})
+}else if(type !== "limit" && type !== "market"){
+    res.status(400).json({message : "Order type can only be limit or market, it must be in lowercase",code : 400})
+}else if(type === "market" && price === null){
+
+}else if(type === "market" && price === null || price === undefined ? false : typeof price !== 'number'){
+    res.status(400).json({message : "Price can only be number.",code : 400})
+}else if(price < 0){
+    res.status(400).json({message : "Price cannot be less than or equal to 0",code : 400})
+}else if(typeof size !== 'number'){
+    res.status(400).json({message : "Size can only be number.",code : 400})
+}else if(size < 0){
+    res.status(400).json({message : "Size cannot be less than or equal to 0",code : 400})
+}else if(direction === "buy" && type === "limit"){
+
+    const getAsks = await db.query('select price from askLimitOrders ORDER BY price ASC,time ASC;')
+    const getAsksArr = getAsks[0]
+ 
+    //inserting limit order buy into the database
+
+    if(postOnly === true){
+      if(getAsksArr.length !== 0){
+        if(price >= getAsksArr[0].price){
+            res.status(403).json({message : "Cannot be a taker if post only is true.",code : 403})
+        }else{
+            const queryString = "insert into bidLimitOrders(symbol,type,price,size,time) values(?,?,?,?,?)"
+            const insertTrade = await db.query(queryString,[symbol,type,price,size,time])
+            const insertTradeArr = insertTrade[0]
+            if(insertTradeArr.affectedRows !== 0){
+                res.status(201).json({message : "Limit Order Posted Successfully",code : 201})
+            }
+        }
+       }else if(getAsksArr.length === 0){
+          const queryString = "insert into bidLimitOrders(symbol,type,price,size,time) values(?,?,?,?,?)"
+          const insertTrade = await db.query(queryString,[symbol,type,price,size,time])
+          const insertTradeArr = insertTrade[0]
+              if(insertTradeArr.affectedRows !== 0){
+                res.status(201).json({message : "Limit Order Posted Successfully",code : 201})
+              }
+       } 
+    }else if(postOnly === false){
+        if(getAsksArr.length !== 0){
+            if(price >= getAsksArr[0].price){
+                marketOrders()
+            }else{
+                const queryString = "insert into bidLimitOrders(symbol,type,price,size,time) values(?,?,?,?,?)"
+                const insertTrade = await db.query(queryString,[symbol,type,price,size,time])
+                const insertTradeArr = insertTrade[0]
+                if(insertTradeArr.affectedRows !== 0){
+                    res.status(201).json({message : "Limit Order Posted Successfully",code : 201})
+                }
+            }
+
+        }else if(getAsksArr.length === 0){
+          const queryString = "insert into bidLimitOrders(symbol,type,price,size,time) values(?,?,?,?,?)"
+          const insertTrade = await db.query(queryString,[symbol,type,price,size,time])
+          const insertTradeArr = insertTrade[0]
+              if(insertTradeArr.affectedRows !== 0){
+                res.status(201).json({message : "Limit Order Posted Successfully",code : 201})
+              }
+        }        
+    }
+
+
+}else if(direction === "sell" && type === "limit"){
+
+    const getBids = await db.query('select price from bidLimitOrders ORDER BY price DESC,time ASC;')
+    const getBidsArr = getBids[0]
+
+    //inserting limit order sell into the database
+
+
+
+    if(postOnly === true){
+      if(getBidsArr.length !== 0){
+        if(price <= getBidsArr[0].price){
+            res.status(403).json({message : "Cannot be a taker if post only is true.",code : 403})
+        }else{
+            const queryString = "insert into askLimitOrders(symbol,type,price,size,time) values(?,?,?,?,?)"
+            const insertTrade = await db.query(queryString,[symbol,type,price,size,time])
+            const insertTradeArr = insertTrade[0]
+            if(insertTradeArr.affectedRows !== 0){
+                res.status(201).json({message : "Limit Order Posted Successfully",code : 201})
+            }
+        }
+      }else if(getBidsArr.length === 0){
+        const queryString = "insert into askLimitOrders(symbol,type,price,size,time) values(?,?,?,?,?)"
+        const insertTrade = await db.query(queryString,[symbol,type,price,size,time])
+        const insertTradeArr = insertTrade[0]
+        if(insertTradeArr.affectedRows !== 0){
+            res.status(201).json({message : "Limit Order Posted Successfully",code : 201})
+        }
+      } 
+    }else if(postOnly === false){
+      if(getBidsArr.length !== 0){  
+        if(price <= getBidsArr[0].price){
+            marketOrders()
+        }else{
+            const queryString = "insert into askLimitOrders(symbol,type,price,size,time) values(?,?,?,?,?)"
+            const insertTrade = await db.query(queryString,[symbol,type,price,size,time])
+            const insertTradeArr = insertTrade[0]
+            if(insertTradeArr.affectedRows !== 0){
+                res.status(201).json({message : "Limit Order Posted Successfully",code : 201})
+            }
+        }
+      }else if(getBidsArr.length === 0){
+        const queryString = "insert into askLimitOrders(symbol,type,price,size,time) values(?,?,?,?,?)"
+        const insertTrade = await db.query(queryString,[symbol,type,price,size,time])
+        const insertTradeArr = insertTrade[0]
+        if(insertTradeArr.affectedRows !== 0){
+            res.status(201).json({message : "Limit Order Posted Successfully",code : 201})
+        }
+      } 
+    }
+
+
+}else if(type === "market"){
+    
+//calling marketOrder function to insert and process market orders
+marketOrders()
 
 
 }
