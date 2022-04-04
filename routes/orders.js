@@ -112,7 +112,7 @@ const marketOrders = async() => {
                             
                         }
                     }else{
-                        const avgPrice = costBasis / marketBuyArr[0].size;
+      
                         const rows = index - 1
                         
                         const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',rows);
@@ -121,11 +121,15 @@ const marketOrders = async() => {
                             const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
                             
                             const updateRow = await db.query('UPDATE askLimitOrders SET size = ? ORDER BY price ASC,time ASC LIMIT ?',[sub,1]);
-                            const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time]);
                             
                             
-
+                            
                             if(updateRow[0].changedRows !== 0){
+                                const fetchAsks = await db.query('select size,price from askLimitOrders ORDER BY price ASC,time ASC;');
+                                const askSub = costBasis - fetchAsks[0][0].price * fetchAsks[0][0].size 
+                                const avgPrice =  askSub / marketBuyArr[0].size;
+    
+                                const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time]);
                                //Deleting market order from the database after the trade execution 
 
                                 const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
@@ -170,7 +174,7 @@ const marketOrders = async() => {
 
       let limitSize = updateBidsArr[0].size;
       let index = 1;
-      let bidPriceSum = updateBidsArr[0].price;
+      let costBasis = updateBidsArr[0].price * updateBidsArr[0].size;
       const time = Date.now()
 
 
@@ -179,7 +183,7 @@ const marketOrders = async() => {
         if(marketSellArr[0].size > limitSize){                    
             limitSize += updateBidsArr[i].size
             index += 1
-            bidPriceSum += updateBidsArr[i].price
+            costBasis += updateBidsArr[i].price * updateBidsArr[i].size
 
         
         }else{
@@ -190,11 +194,12 @@ const marketOrders = async() => {
     }
 
     const sub = limitSize - marketSellArr[0].size;
-    const avgPrice = bidPriceSum / index
+
 
     if(sub !== 0){
-
+        
         if(marketSellArr[0].size > limitSize){
+            const avgPrice = costBasis / limitSize;
             const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
 
             const deleteRows = await db.query('DELETE FROM bidLimitOrders ORDER BY price DESC,time ASC LIMIT ?;',index);
@@ -211,13 +216,14 @@ const marketOrders = async() => {
 
         }else if(limitSize > marketSellArr[0].size){
             if(index === 1){
+                const avgPrice = updateBidsArr[0].price;
                 const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
             
                 const updateRow = await db.query('UPDATE bidLimitOrders SET size = ? ORDER BY price DESC,time ASC LIMIT ?',[sub,1]);
                 
                 
                 if(updateRow[0].changedRows !== 0){
-                    const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,limitSize,time]);
+                    const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time]);
                   
                     //Deleting market order from the database after the trade execution 
                     
@@ -234,14 +240,19 @@ const marketOrders = async() => {
                     const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
                     
                     const updateRow = await db.query('UPDATE bidLimitOrders SET size = ? ORDER BY price DESC,time ASC LIMIT ?',[sub,1]);
-                    const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time]);
                     
                     
-
+                    
                     if(updateRow[0].changedRows !== 0){
+                        const fetchBids = await db.query('select size,price from bidLimitOrders ORDER BY price DESC,time ASC;');
+                        const bidSub = costBasis - fetchBids[0][0].price * fetchBids[0][0].size 
+                        const avgPrice =  bidSub / marketSellArr[0].size;
+                        const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time]);
+                        
                        //Deleting market order from the database after the trade execution 
 
                         const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
+                        console.log(deleteRows);
                         res.status(200).json({message : "Market Order Filled Successfully", code : 200})
 
                     }
@@ -257,6 +268,7 @@ const marketOrders = async() => {
         
         
     }else if(sub === 0){
+        const avgPrice = costBasis / limitSize;
         const deleteRows = await db.query('DELETE FROM bidLimitOrders ORDER BY price DESC,time ASC LIMIT ?;',index);
         
         const queryStringTrades = "insert into trades(symbol,direction,price,size,time) values(?,?,?,?,?);"
