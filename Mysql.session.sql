@@ -49,4 +49,7 @@ closeTime BIGINT not NULL,
 primary key(id)
 )
 
+--@block
+alter TABLE userDetails MODIFY apiKey VARCHAR(255)
+
 
