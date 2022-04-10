@@ -52,4 +52,25 @@ primary key(id)
 --@block
 alter TABLE userDetails MODIFY apiKey VARCHAR(255)
 
+--@block
+create TABLE ledger(
+  lid bigint AUTO_INCREMENT,
+  bitcoin FLOAT(24) not NULL,
+  totalBalance FLOAT(24) not NULL,
+  userId BIGINT,
+  PRIMARY key (lid)
+)
+
+--@block 
+alter TABLE ledger ADD FOREIGN key (userId) REFERENCES userDetails(userId);
+
+--@block
+alter table ledger alter column bitcoin set DEFAULT 0;
+
+--@block
+alter table trades add column userId BIGINT not NULL;
+
+--@block 
+alter table trades add FOREIGN key (userId) REFERENCES userDetails(userId);
+
 
