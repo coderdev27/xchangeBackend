@@ -60,9 +60,15 @@ const marketOrders = async() => {
     if(direction === 'buy'){
       
       const marketBuy = await db.query('SELECT * FROM marketOrders WHERE direction = ? ORDER BY time ASC;',"buy")
-      const updateAsks = await db.query('select size,price from askLimitOrders ORDER BY price ASC,time ASC;')
+      const updateAsks = await db.query('select size,price,userId from askLimitOrders ORDER BY price ASC,time ASC;')
       const marketBuyArr = marketBuy[0];
       const updateAsksArr = updateAsks[0];
+
+        //fetch wallet balance
+
+       const walletBalance = await db.query("select usd,bitcoin from ledger where userId = ?",[userId]);
+       const walletBalanceArr = walletBalance[0];
+
 
       let limitSize = updateAsksArr[0].size;
       let index = 1;
@@ -92,37 +98,68 @@ const marketOrders = async() => {
                 
                 if(marketBuyArr[0].size > limitSize){
                     const avgPrice = costBasis / limitSize;
-                    const queryStringTrades = "insert into trades(symbol,direction,price,size,time,userId) values(?,?,?,?,?,?);"
+                    const balanceUpdate = walletBalanceArr[0].usd - (avgPrice * limitSize) - (limitSize / 100 * feesTaker);
+                    const balanceUpdateBitcoin = walletBalanceArr[0].bitcoin + limitSize
 
-                    const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',index);
-                    if(deleteRows[0].affectedRows !== 0){
-                        
-                        const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,limitSize,time,userId]);
-                        
-                        //Deleting market order from the database after the trade execution 
-                        
-                        const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
-                        res.status(200).json({message : "Market Order Partially Filled Successfully", code : 200})
+                    if(walletBalanceArr[0].usd >= avgPrice){
+                        const queryStringTrades = "insert into trades(symbol,direction,price,size,time,userId) values(?,?,?,?,?,?);"
 
-                    }  
+                        for(let y = 0; y < index; y++){
+                           
+                            const fetchWallet = await db.query("select usd from ledger where userId = ?",[updateAsksArr[y].userId]);
+                            const walletUpdateVal = fetchWallet[0][0].usd + (updateAsksArr[y].price * updateAsksArr[y].size);
+                            const updateLimitWallet = await db.query("update ledger set usd = ? where userId = ?;",[walletUpdateVal,updateAsksArr[y].userId]);
+                            
+                        }
+
+                        const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',index);
+                        if(deleteRows[0].affectedRows !== 0){
+                           
+                            const walletUpdate = await db.query("update ledger set usd = ?, bitcoin = ? where userId = ?;",[balanceUpdate,balanceUpdateBitcoin,userId]);
+                            
+                            const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,limitSize,time,userId]);
+                        
+                            //Deleting market order from the database after the trade execution 
+                        
+                            const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
+                            res.status(200).json({message : "Market Order Partially Filled Successfully", code : 200})
+
+                        }  
+                    }else{
+                        res.status(403).json({message : "Not enough balance to fulfil this order.",code : 403});
+                    }
  
                 }else if(limitSize > marketBuyArr[0].size){
                     if(index === 1){
-                        const avgPrice = updateAsksArr[0].price
-                        const queryStringTrades = "insert into trades(symbol,direction,price,size,time,userId) values(?,?,?,?,?,?);"
-                        
-                        const updateRow = await db.query('UPDATE askLimitOrders SET size = ? ORDER BY price ASC,time ASC LIMIT ?',[sub,1]);
-                        
-                        
-                        if(updateRow[0].changedRows !== 0){
-                            const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,marketBuyArr[0].size,time,userId]);
+
+                        if( walletBalanceArr[0].usd >= (updateAsksArr[0].price * updateAsksArr[0].size) ){
+
+                            const avgPrice = updateAsksArr[0].price
+                            const queryStringTrades = "insert into trades(symbol,direction,price,size,time,userId) values(?,?,?,?,?,?);"
                             
-                            //Deleting market order from the database after the trade execution 
+                            const updateRow = await db.query('UPDATE askLimitOrders SET size = ? ORDER BY price ASC,time ASC LIMIT ?',[sub,1]);
                             
-                            const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
-                            res.status(200).json({message : "Market Order Filled Successfully", code : 200})
+                            const fetchWalletUsd = await db.query("select usd from ledger where userId = ?;",[updateAsksArr[0].userId])
+                            const updatewalletLimitVal = fetchWalletUsd[0][0].usd + (updateAsksArr[0].price * size);
+                            const updateWalletLimit = await db.query("update ledger set usd = ? where userId = ?;",[updatewalletLimitVal,updateAsksArr[0].userId]);
+                            const balanceUpdate = walletBalanceArr[0].usd - (avgPrice * size) - (size / 100 * feesTaker);
+                            const btcBalanceUpdate = walletBalanceArr[0].bitcoin + size
+                            const updateWallet = await db.query("update ledger set bitcoin = ?,usd = ? where userId = ?;",[btcBalanceUpdate,balanceUpdate,userId])
                             
-                        }
+                            if(updateRow[0].changedRows !== 0){
+                                const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,marketBuyArr[0].size,time,userId]);
+                                
+                                //Deleting market order from the database after the trade execution 
+                                
+                                const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
+                                res.status(200).json({message : "Market Order Filled Successfully", code : 200})
+                                
+                            }
+                            
+                       }else{
+                        res.status(403).json({message : "Not enough balance to fulfil this order.",code : 403});                           
+                       }
+
                     }else{
       
                         const rows = index - 1
@@ -542,8 +579,3 @@ marketOrders()
 
 
 export default router;
-
-
-
-
-
