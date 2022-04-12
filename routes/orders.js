@@ -98,7 +98,7 @@ const marketOrders = async() => {
                 
                 if(marketBuyArr[0].size > limitSize){
                     const avgPrice = costBasis / limitSize;
-                    const balanceUpdate = walletBalanceArr[0].usd - (avgPrice * limitSize) - (limitSize / 100 * feesTaker);
+                    const balanceUpdate = walletBalanceArr[0].usd - (avgPrice * limitSize) - (avgPrice * limitSize  / 100 * feesTaker);
                     const balanceUpdateBitcoin = walletBalanceArr[0].bitcoin + limitSize
 
                     if(walletBalanceArr[0].usd >= avgPrice){
@@ -126,6 +126,7 @@ const marketOrders = async() => {
 
                         }  
                     }else{
+                        const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
                         res.status(403).json({message : "Not enough balance to fulfil this order.",code : 403});
                     }
  
@@ -142,7 +143,7 @@ const marketOrders = async() => {
                             const fetchWalletUsd = await db.query("select usd from ledger where userId = ?;",[updateAsksArr[0].userId])
                             const updatewalletLimitVal = fetchWalletUsd[0][0].usd + (updateAsksArr[0].price * size);
                             const updateWalletLimit = await db.query("update ledger set usd = ? where userId = ?;",[updatewalletLimitVal,updateAsksArr[0].userId]);
-                            const balanceUpdate = walletBalanceArr[0].usd - (avgPrice * size) - (size / 100 * feesTaker);
+                            const balanceUpdate = walletBalanceArr[0].usd - (avgPrice * size) - (avgPrice * size / 100 * feesTaker);
                             const btcBalanceUpdate = walletBalanceArr[0].bitcoin + size
                             const updateWallet = await db.query("update ledger set bitcoin = ?,usd = ? where userId = ?;",[btcBalanceUpdate,balanceUpdate,userId])
                             
@@ -157,38 +158,73 @@ const marketOrders = async() => {
                             }
                             
                        }else{
+                        const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
                         res.status(403).json({message : "Not enough balance to fulfil this order.",code : 403});                           
                        }
 
                     }else{
       
-                        const rows = index - 1
-                        
-                        const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',rows);
-                        
-                        if(deleteRows[0].affectedRows !== 0){
-                            const queryStringTrades = "insert into trades(symbol,direction,price,size,time,userId) values(?,?,?,?,?,?);"
-                            
-                            const updateRow = await db.query('UPDATE askLimitOrders SET size = ? ORDER BY price ASC,time ASC LIMIT ?',[sub,1]);
-                            
-                            
-                            
-                            if(updateRow[0].changedRows !== 0){
-                                const fetchAsks = await db.query('select size,price from askLimitOrders ORDER BY price ASC,time ASC;');
-                                const askSub = costBasis - fetchAsks[0][0].price * fetchAsks[0][0].size 
-                                const avgPrice =  askSub / marketBuyArr[0].size;
-    
-                                const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time,userId]);
-                               //Deleting market order from the database after the trade execution 
+                        const rows = index - 1;
 
-                                const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
-                                res.status(200).json({message : "Market Order Filled Successfully", code : 200})
+                        //average price calculation
+
+                        const askSub = costBasis - updateAsksArr[rows].price * sub; 
+                        const avgPrice = askSub / marketBuyArr[0].size;
+
+                        if( walletBalanceArr[0].usd >= (avgPrice * marketBuyArr[0].size) ){
+
+                            for(let z = 0; z < rows; z++){
+                              
+                                const fetchWalletLimit = await db.query("select usd from ledger where userId = ?;",[updateAsksArr[z].userId]);
+                                const updateValUsd = fetchWalletLimit[0][0].usd + updateAsksArr[z].price * updateAsksArr[z].size;
+                                const walletBalUpdateLimit = await db.query("update ledger set usd = ? where userId = ?;",[updateValUsd,updateAsksArr[z].userId]);
 
                             }
-                            
+                           
+                            const fetchWalletLimit = await db.query("select usd from ledger where userId = ?;",[updateAsksArr[rows].userId]);
+                            const updateUsdVal = fetchWalletLimit[0][0].usd + updateAsksArr[rows].price * sub;
+                            const updateLimitWalletVal = await db.query("update ledger set usd = ? where userId = ?;",[updateUsdVal,updateAsksArr[rows].userId]);
+
+                            if(updateLimitWalletVal[0].changedRows !== 0){
+                        
+                                const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',rows);
+                                
+                                if(deleteRows[0].affectedRows !== 0){
+                                 const queryStringTrades = "insert into trades(symbol,direction,price,size,time,userId) values(?,?,?,?,?,?);"
+                                 
+                                 const updateRow = await db.query('UPDATE askLimitOrders SET size = ? ORDER BY price ASC,time ASC LIMIT ?',[sub,1]);
+                                 
+                                 
+                                 
+                                 if(updateRow[0].changedRows !== 0){
+                                     // const fetchAsks = await db.query('select size,price from askLimitOrders ORDER BY price ASC,time ASC;');
+                                     // const askSub = costBasis - fetchAsks[0][0].price * fetchAsks[0][0].size 
+                                     // const avgPrice =  askSub / marketBuyArr[0].size;
+                                  
+                                     const updateUsdValue = walletBalanceArr[0].usd - (avgPrice * marketBuyArr[0].size) - (avgPrice * marketBuyArr[0].size / 100 * feesTaker);
+                                     const updateBtcValue = walletBalanceArr[0].bitcoin + size; 
+                                     const walletBalUpdate = await db.query("update ledger set usd = ?,bitcoin = ? where userId = ?;",[updateUsdValue,updateBtcValue,userId]);
+                                     
+                                    
+         
+                                     const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time,userId]);
+                                    //Deleting market order from the database after the trade execution 
+     
+                                     const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
+                                     res.status(200).json({message : "Market Order Filled Successfully", code : 200})
+     
+                                 }
+                                 
+                                }
+                                
+                            }
+                        
+                        
+                        }else{
+                            const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
+                            res.status(403).json({message : "Not enough balance to fulfil this order.",code : 403}); 
                         }
-                        
-                        
+
                     }
                     
                 }
