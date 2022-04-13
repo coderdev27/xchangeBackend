@@ -234,21 +234,39 @@ const marketOrders = async() => {
                 
             }else if(sub === 0){
                 const avgPrice = costBasis / limitSize;
+
+                if(walletBalanceArr[0].usd >= (avgPrice * size)){
+
+                    for(let a = 0; a < index; a++){
+
+                        const fetchLimitWallet = await db.query("select usd from ledger where userId = ?;",[updateAsksArr[a].userId]);
+                        const updateUsdVal = fetchLimitWallet[0][0].usd + updateAsksArr[a].price * updateAsksArr[a].size;
+                        const updateWallet = await db.query("update ledger set usd = ? where userId = ?;",[updateUsdVal,updateAsksArr[a].userId]);
+                    }
+
+                    const updateUsdVal = walletBalanceArr[0].usd - (avgPrice * size) - (avgPrice * size /100 * feesTaker);
+                    const updateBtcVal = walletBalanceArr[0].bitcoin + size;
+                    const updateWallet = await db.query("update ledger set bitcoin = ?, usd = ? where userId = ?;",[updateBtcVal,updateUsdVal,userId]);
                 
-                const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',index);
+                    const deleteRows = await db.query('DELETE FROM askLimitOrders ORDER BY price ASC,time ASC LIMIT ?;',index);
                 
-                const queryStringTrades = "insert into trades(symbol,direction,price,size,time,userId) values(?,?,?,?,?,?);"
+                    const queryStringTrades = "insert into trades(symbol,direction,price,size,time,userId) values(?,?,?,?,?,?);"
                 
                 
-                if(deleteRows[0].affectedRows !== 0){
+                    if(deleteRows[0].affectedRows !== 0){
                     const tradesInsert = await db.query(queryStringTrades,[symbol,direction,avgPrice,size,time,userId])
                     
                     //Deleting market order from the database after the trade execution 
                     
                     const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
                     res.status(200).json({message : "Market Order Filled Successfully", code : 200})
+                    }
 
+                }else{
+                    const deleteRows = await db.query('DELETE FROM marketOrders ORDER BY time ASC LIMIT ?;',1);
+                    res.status(403).json({message : "Not enough balance to fulfil this order.",code : 403}); 
                 }
+
             }
            
     }else if(direction === "sell"){
