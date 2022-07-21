@@ -1,0 +1,13 @@
+Order book
+
+security symbol
+order direction 
+Limit Price
+Size
+
+While placing limit orders
+Buy = Bids
+Sells = Asks
+
+Price/time priority 
+If two orders are submitted at the same price then time is taken into consideration. Person who placed order before other person his order will be kept first because of the time priority.
