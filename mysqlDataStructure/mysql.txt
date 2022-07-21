@@ -1,0 +1,90 @@
+CREATE TABLE `askLimitOrders` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `symbol` varchar(255) NOT NULL,
+  `direction` varchar(10) NOT NULL DEFAULT 'sell',
+  `price` float NOT NULL,
+  `type` varchar(30) NOT NULL,
+  `size` float NOT NULL,
+  `time` bigint NOT NULL,
+  `userId` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `userId` (`userId`),
+  CONSTRAINT `askLimitOrders_ibfk_1` FOREIGN KEY (`userId`) REFERENCES `userDetails` (`userId`)
+) ENGINE=InnoDB AUTO_INCREMENT=387992 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `bidLimitOrders` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `symbol` varchar(255) NOT NULL,
+  `direction` varchar(10) NOT NULL DEFAULT 'buy',
+  `price` float NOT NULL,
+  `type` varchar(30) NOT NULL,
+  `size` float NOT NULL,
+  `time` bigint NOT NULL,
+  `userId` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `userId` (`userId`),
+  CONSTRAINT `bidLimitOrders_ibfk_1` FOREIGN KEY (`userId`) REFERENCES `userDetails` (`userId`)
+) ENGINE=InnoDB AUTO_INCREMENT=6308 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `ledger` (
+  `lid` bigint NOT NULL AUTO_INCREMENT,
+  `bitcoin` float NOT NULL DEFAULT '0',
+  `totalBalance` float NOT NULL DEFAULT '0',
+  `userId` bigint DEFAULT NULL,
+  `usd` float DEFAULT '0',
+  PRIMARY KEY (`lid`),
+  KEY `userId` (`userId`),
+  CONSTRAINT `ledger_ibfk_1` FOREIGN KEY (`userId`) REFERENCES `userDetails` (`userId`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `marketOrders` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `symbol` varchar(255) NOT NULL,
+  `direction` varchar(10) NOT NULL,
+  `type` varchar(30) NOT NULL,
+  `size` float NOT NULL,
+  `time` bigint NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=14064 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE `ohlc` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `openTime` bigint NOT NULL,
+  `openPrice` float NOT NULL,
+  `highPrice` float NOT NULL,
+  `lowPrice` float NOT NULL,
+  `closePrice` float NOT NULL,
+  `volume` float NOT NULL,
+  `closeTime` bigint NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=101 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE `trades` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `symbol` varchar(255) NOT NULL,
+  `direction` varchar(10) NOT NULL,
+  `price` float NOT NULL,
+  `size` float NOT NULL,
+  `time` bigint NOT NULL,
+  `userId` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `userId` (`userId`),
+  CONSTRAINT `trades_ibfk_1` FOREIGN KEY (`userId`) REFERENCES `userDetails` (`userId`)
+) ENGINE=InnoDB AUTO_INCREMENT=12276 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE `userDetails` (
+  `userId` bigint NOT NULL AUTO_INCREMENT,
+  `email` varchar(50) NOT NULL,
+  `password` varchar(255) DEFAULT NULL,
+  `mobileNumber` int NOT NULL,
+  `apiKey` varchar(255) DEFAULT NULL,
+  `secretKey` varchar(255) DEFAULT NULL,
+  `freezed` int DEFAULT '0',
+  `withdrawalEnabled` int DEFAULT '1',
+  PRIMARY KEY (`userId`),
+  UNIQUE KEY `email` (`email`),
+  UNIQUE KEY `mobileNumber` (`mobileNumber`)
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
