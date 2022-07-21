@@ -8,6 +8,7 @@ import deleteOrders from "./routes/deleteOrders.js";
 import getOpenTrades from "./routes/getOpenTrades.js";
 import getTrades from "./routes/getTrades.js";
 import getServerTime from "./routes/getServerTime.js";
+//import generarteCryptoAddress from "./routes/generateCryptoAddress.js";
 
 const app = express();
 const port = 3000; 
